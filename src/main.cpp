@@ -20,22 +20,65 @@ Adafruit_SSD1306 display(
     -1
 );
 
+enum Algorithm
+{
+    DFS,
+    BFS
+};
+
+Algorithm selectedAlgorithm = DFS;
+
 bool lastUp = HIGH;
 bool lastDown = HIGH;
 bool lastSelect = HIGH;
 
-void showMessage(const char *message)
+void drawMenu()
 {
     display.clearDisplay();
 
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
 
-    display.setCursor(20, 15);
+    display.setCursor(25, 0);
     display.println("DSA MazeBot");
 
-    display.setCursor(20, 35);
-    display.println(message);
+    display.setCursor(10, 20);
+
+    if (selectedAlgorithm == DFS)
+        display.println("> DFS");
+    else
+        display.println("  DFS");
+
+    display.setCursor(10, 35);
+
+    if (selectedAlgorithm == BFS)
+        display.println("> BFS");
+    else
+        display.println("  BFS");
+
+    display.setCursor(10, 52);
+    display.println("SELECT = Start");
+
+    display.display();
+}
+
+void showSelected()
+{
+    display.clearDisplay();
+
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+
+    display.setCursor(25, 10);
+    display.println("Selected:");
+
+    display.setTextSize(2);
+    display.setCursor(40, 30);
+
+    if (selectedAlgorithm == DFS)
+        display.println("DFS");
+    else
+        display.println("BFS");
 
     display.display();
 }
@@ -59,9 +102,9 @@ void setup()
         }
     }
 
-    showMessage("Test buttons");
+    Serial.println("DSA MazeBot menu ready");
 
-    Serial.println("Button test ready");
+    drawMenu();
 }
 
 void loop()
@@ -72,20 +115,32 @@ void loop()
 
     if (currentUp == LOW && lastUp == HIGH)
     {
-        Serial.println("UP pressed");
-        showMessage("UP pressed!");
+        selectedAlgorithm = DFS;
+
+        Serial.println("DFS highlighted");
+
+        drawMenu();
     }
 
     if (currentDown == LOW && lastDown == HIGH)
     {
-        Serial.println("DOWN pressed");
-        showMessage("DOWN pressed!");
+        selectedAlgorithm = BFS;
+
+        Serial.println("BFS highlighted");
+
+        drawMenu();
     }
 
     if (currentSelect == LOW && lastSelect == HIGH)
     {
-        Serial.println("SELECT pressed");
-        showMessage("SELECT pressed!");
+        Serial.print("Selected algorithm: ");
+
+        if (selectedAlgorithm == DFS)
+            Serial.println("DFS");
+        else
+            Serial.println("BFS");
+
+        showSelected();
     }
 
     lastUp = currentUp;
