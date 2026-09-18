@@ -3,6 +3,8 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
+#include "sensors.h"
+
 /* ---------------- Buttons ---------------- */
 
 #define BUTTON_UP 4
@@ -52,7 +54,7 @@ bool lastUp = HIGH;
 bool lastDown = HIGH;
 bool lastSelect = HIGH;
 
-/* ---------------- Functions ---------------- */
+/* ---------------- OLED Functions ---------------- */
 
 void drawMenu()
 {
@@ -138,6 +140,7 @@ void showFinished()
     display.display();
 }
 
+/* ---------------- Menu ---------------- */
 
 void handleMenu()
 {
@@ -197,35 +200,25 @@ void handleMenu()
     lastSelect = currentSelect;
 }
 
+/* ---------------- Running ---------------- */
 
 void runRobot()
 {
+    static unsigned long lastSensorPrint = 0;
+
+    if (millis() - lastSensorPrint >= 200)
+    {
+        readSensors();
+        printSensors();
+
+        lastSensorPrint = millis();
+    }
+
     bool currentSelect = digitalRead(BUTTON_SELECT);
 
-    /*
-     * Maze solving will eventually go here.
-     *
-     * Later:
-     *
-     * if (selectedAlgorithm == DFS)
-     *     runDFS();
-     *
-     * else if (selectedAlgorithm == BFS)
-     *     runBFS();
-     *
-     * else if (selectedAlgorithm == A_STAR)
-     *     runAStar();
-     */
-
-    /*
-     * TEMPORARY TEST:
-     *
-     * Press SELECT again to pretend
-     * the robot finished the maze.
-     */
     if (currentSelect == LOW && lastSelect == HIGH)
     {
-        Serial.println("Maze finished");
+        Serial.println("Stopping robot");
 
         robotState = FINISHED;
 
@@ -235,14 +228,14 @@ void runRobot()
     lastSelect = currentSelect;
 }
 
+/* ---------------- Finished ---------------- */
 
 void handleFinished()
 {
     bool currentSelect = digitalRead(BUTTON_SELECT);
 
     /*
-     * Press SELECT to return
-     * to the algorithm menu.
+     * Press SELECT to return to menu.
      */
     if (currentSelect == LOW && lastSelect == HIGH)
     {
@@ -256,7 +249,6 @@ void handleFinished()
     lastSelect = currentSelect;
 }
 
-
 /* ---------------- Setup ---------------- */
 
 void setup()
@@ -266,6 +258,8 @@ void setup()
     pinMode(BUTTON_UP, INPUT_PULLUP);
     pinMode(BUTTON_DOWN, INPUT_PULLUP);
     pinMode(BUTTON_SELECT, INPUT_PULLUP);
+
+    setupSensors();
 
     Wire.begin(SDA_PIN, SCL_PIN);
 
@@ -282,7 +276,6 @@ void setup()
 
     drawMenu();
 }
-
 
 /* ---------------- Main Loop ---------------- */
 
