@@ -8,6 +8,7 @@
         {
             "name": "PlatformIO",
             "includePath": [
+                "c:/Users/Sugoi/Documents/miniBot/mazeBot/include",
                 "c:/Users/Sugoi/Documents/miniBot/mazeBot/src",
                 "c:/Users/Sugoi/Documents/miniBot/mazeBot/.pio/libdeps/freenove_esp32_s3_wroom/Adafruit SSD1306",
                 "c:/Users/Sugoi/Documents/miniBot/mazeBot/.pio/libdeps/freenove_esp32_s3_wroom/Adafruit GFX Library",
@@ -249,6 +250,7 @@
             "browse": {
                 "limitSymbolsToIncludedHeaders": true,
                 "path": [
+                    "c:/Users/Sugoi/Documents/miniBot/mazeBot/include",
                     "c:/Users/Sugoi/Documents/miniBot/mazeBot/src",
                     "c:/Users/Sugoi/Documents/miniBot/mazeBot/.pio/libdeps/freenove_esp32_s3_wroom/Adafruit SSD1306",
                     "c:/Users/Sugoi/Documents/miniBot/mazeBot/.pio/libdeps/freenove_esp32_s3_wroom/Adafruit GFX Library",

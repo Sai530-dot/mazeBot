@@ -13,6 +13,10 @@ int sensorValues[5];
 
 void setupSensors()
 {
+    // 12-bit ADC:
+    // readings range from 0 to 4095
+    analogReadResolution(12);
+
     for (int i = 0; i < 5; i++)
     {
         pinMode(sensorPin[i], INPUT);
@@ -23,18 +27,23 @@ void readSensors()
 {
     for (int i = 0; i < 5; i++)
     {
-        sensorValues[i] = digitalRead(sensorPin[i]);
+        sensorValues[i] = analogRead(sensorPin[i]);
     }
 }
 
 void printSensors()
 {
-    Serial.print("S1-S5: ");
-
     for (int i = 0; i < 5; i++)
     {
+        Serial.print("S");
+        Serial.print(i + 1);
+        Serial.print(": ");
         Serial.print(sensorValues[i]);
-        Serial.print(" ");
+
+        if (i < 4)
+        {
+            Serial.print(" | ");
+        }
     }
 
     Serial.println();

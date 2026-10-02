@@ -4,6 +4,7 @@
 #include <Adafruit_SSD1306.h>
 
 #include "sensors.h"
+#include "motors.h"
 
 /* ---------------- Buttons ---------------- */
 
@@ -249,6 +250,43 @@ void handleFinished()
     lastSelect = currentSelect;
 }
 
+/* ---------------- Motor Test ---------------- */
+
+void testMotors()
+{
+    Serial.println("Testing motors...");
+
+    Serial.println("Forward");
+    moveForward();
+    delay(1000);
+
+    stopMotors();
+    delay(1000);
+
+    Serial.println("Backward");
+    moveBackward();
+    delay(1000);
+
+    stopMotors();
+    delay(1000);
+
+    Serial.println("Left");
+    turnLeft();
+    delay(700);
+
+    stopMotors();
+    delay(1000);
+
+    Serial.println("Right");
+    turnRight();
+    delay(700);
+
+    stopMotors();
+
+    Serial.println("Motor test complete");
+}
+
+
 /* ---------------- Setup ---------------- */
 
 void setup()
@@ -260,6 +298,7 @@ void setup()
     pinMode(BUTTON_SELECT, INPUT_PULLUP);
 
     setupSensors();
+    setupMotors();
 
     Wire.begin(SDA_PIN, SCL_PIN);
 
@@ -275,6 +314,7 @@ void setup()
     Serial.println("DSA MazeBot ready");
 
     drawMenu();
+    testMotors();
 }
 
 /* ---------------- Main Loop ---------------- */
