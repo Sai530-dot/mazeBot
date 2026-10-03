@@ -1,65 +1,134 @@
 #include <Arduino.h>
 #include "motors.h"
 
-// Left motor
-const int IN1 = 15;
-const int IN2 = 16;
+/* -------- TB6612 Pins -------- */
 
-// Right motor
-const int IN3 = 17;
-const int IN4 = 18;
+#define PWMA 39
+#define AIN2 16
+#define AIN1 15
+#define STBY 38
+
+#define BIN1 17
+#define BIN2 18
+#define PWMB 40
+
+/* PIN SETUP */
 
 void setupMotors()
 {
-    pinMode(IN1, OUTPUT);
-    pinMode(IN2, OUTPUT);
-    pinMode(IN3, OUTPUT);
-    pinMode(IN4, OUTPUT);
+    pinMode(PWMA, OUTPUT);
+    pinMode(AIN1, OUTPUT);
+    pinMode(AIN2, OUTPUT);
 
-    stopMotors();
+    pinMode(PWMB, OUTPUT);
+    pinMode(BIN1, OUTPUT);
+    pinMode(BIN2, OUTPUT);
+
+    pinMode(STBY, OUTPUT);
+
+    /*
+     * SAFE START:
+     * driver disabled and motors stopped.
+     */
+    digitalWrite(STBY, LOW);
+
+    digitalWrite(PWMA, LOW);
+    digitalWrite(PWMB, LOW);
+
+    digitalWrite(AIN1, LOW);
+    digitalWrite(AIN2, LOW);
+
+    digitalWrite(BIN1, LOW);
+    digitalWrite(BIN2, LOW);
+
+    Serial.println("Motors initialized");
 }
+
+/* MOVE FORWARD */
 
 void moveForward()
 {
-    digitalWrite(IN1, HIGH);
-    digitalWrite(IN2, LOW);
+    digitalWrite(STBY, HIGH);
 
-    digitalWrite(IN3, HIGH);
-    digitalWrite(IN4, LOW);
+    // Motor A
+    digitalWrite(AIN1, HIGH);
+    digitalWrite(AIN2, LOW);
+
+    // Motor B
+    digitalWrite(BIN1, HIGH);
+    digitalWrite(BIN2, LOW);
+
+    // Full speed for initial test
+    digitalWrite(PWMA, HIGH);
+    digitalWrite(PWMB, HIGH);
 }
+
+/* MOVE BACKWARD */
 
 void moveBackward()
 {
-    digitalWrite(IN1, LOW);
-    digitalWrite(IN2, HIGH);
+    digitalWrite(STBY, HIGH);
 
-    digitalWrite(IN3, LOW);
-    digitalWrite(IN4, HIGH);
+    // Motor A
+    digitalWrite(AIN1, LOW);
+    digitalWrite(AIN2, HIGH);
+
+    // Motor B
+    digitalWrite(BIN1, LOW);
+    digitalWrite(BIN2, HIGH);
+
+    digitalWrite(PWMA, HIGH);
+    digitalWrite(PWMB, HIGH);
 }
+
+/* LEFT WHEEL */
 
 void turnLeft()
 {
-    digitalWrite(IN1, LOW);
-    digitalWrite(IN2, HIGH);
+    digitalWrite(STBY, HIGH);
 
-    digitalWrite(IN3, HIGH);
-    digitalWrite(IN4, LOW);
+    // Motor A backward
+    digitalWrite(AIN1, LOW);
+    digitalWrite(AIN2, HIGH);
+
+    // Motor B forward
+    digitalWrite(BIN1, HIGH);
+    digitalWrite(BIN2, LOW);
+
+    digitalWrite(PWMA, HIGH);
+    digitalWrite(PWMB, HIGH);
 }
+
+/* RIGHT WHEEL */
 
 void turnRight()
 {
-    digitalWrite(IN1, HIGH);
-    digitalWrite(IN2, LOW);
+    digitalWrite(STBY, HIGH);
 
-    digitalWrite(IN3, LOW);
-    digitalWrite(IN4, HIGH);
+    // Motor A forward
+    digitalWrite(AIN1, HIGH);
+    digitalWrite(AIN2, LOW);
+
+    // Motor B backward
+    digitalWrite(BIN1, LOW);
+    digitalWrite(BIN2, HIGH);
+
+    digitalWrite(PWMA, HIGH);
+    digitalWrite(PWMB, HIGH);
 }
+
+/* STOP MOTORS */
 
 void stopMotors()
 {
-    digitalWrite(IN1, LOW);
-    digitalWrite(IN2, LOW);
+    digitalWrite(PWMA, LOW);
+    digitalWrite(PWMB, LOW);
 
-    digitalWrite(IN3, LOW);
-    digitalWrite(IN4, LOW);
+    digitalWrite(AIN1, LOW);
+    digitalWrite(AIN2, LOW);
+
+    digitalWrite(BIN1, LOW);
+    digitalWrite(BIN2, LOW);
+
+    digitalWrite(STBY, LOW);
 }
