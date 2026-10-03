@@ -6,13 +6,13 @@
 #include "sensors.h"
 #include "motors.h"
 
-/* ---------------- Buttons ---------------- */
+/* BUTTONS SETUP */
 
 #define BUTTON_UP 4
 #define BUTTON_DOWN 5
 #define BUTTON_SELECT 6
 
-/* ---------------- OLED ---------------- */
+/* OLED SETUP */
 
 #define SDA_PIN 8
 #define SCL_PIN 9
@@ -24,10 +24,9 @@ Adafruit_SSD1306 display(
     SCREEN_WIDTH,
     SCREEN_HEIGHT,
     &Wire,
-    -1
-);
+    -1);
 
-/* ---------------- Algorithms ---------------- */
+/* ROBOT ALGORITHMS */
 
 enum Algorithm
 {
@@ -38,7 +37,7 @@ enum Algorithm
 
 Algorithm selectedAlgorithm = DFS;
 
-/* ---------------- Robot States ---------------- */
+/* ROBOT STATES */
 
 enum RobotState
 {
@@ -49,13 +48,13 @@ enum RobotState
 
 RobotState robotState = MENU;
 
-/* ---------------- Button States ---------------- */
+/* BUTTON STATES */
 
 bool lastUp = HIGH;
 bool lastDown = HIGH;
 bool lastSelect = HIGH;
 
-/* ---------------- OLED Functions ---------------- */
+/* OLED FUNCTIONS */
 
 void drawMenu()
 {
@@ -97,7 +96,6 @@ void drawMenu()
     display.display();
 }
 
-
 void showRunning()
 {
     display.clearDisplay();
@@ -124,7 +122,6 @@ void showRunning()
     display.display();
 }
 
-
 void showFinished()
 {
     display.clearDisplay();
@@ -141,7 +138,7 @@ void showFinished()
     display.display();
 }
 
-/* ---------------- Menu ---------------- */
+/* MENU DISPLAY */
 
 void handleMenu()
 {
@@ -164,7 +161,7 @@ void handleMenu()
         drawMenu();
     }
 
-    /* DOWN button */
+    /* DOWN BUTTON */
     if (currentDown == LOW && lastDown == HIGH)
     {
         if (selectedAlgorithm == DFS)
@@ -179,7 +176,7 @@ void handleMenu()
         drawMenu();
     }
 
-    /* SELECT button */
+    /* SELECT BUTTON */
     if (currentSelect == LOW && lastSelect == HIGH)
     {
         Serial.print("Starting ");
@@ -201,12 +198,21 @@ void handleMenu()
     lastSelect = currentSelect;
 }
 
-/* ---------------- Running ---------------- */
+/* RUNNING ROBOT */
 
 void runRobot()
 {
     static unsigned long lastSensorPrint = 0;
 
+    /*
+     * TEMPORARY MOTOR TEST:
+     * Keep driving forward while robotState == RUNNING.
+     */
+    moveForward();
+
+    /*
+     * Read sensors while moving.
+     */
     if (millis() - lastSensorPrint >= 200)
     {
         readSensors();
@@ -217,9 +223,14 @@ void runRobot()
 
     bool currentSelect = digitalRead(BUTTON_SELECT);
 
+    /*
+     * Press SELECT again to stop.
+     */
     if (currentSelect == LOW && lastSelect == HIGH)
     {
         Serial.println("Stopping robot");
+
+        stopMotors();
 
         robotState = FINISHED;
 
@@ -229,15 +240,14 @@ void runRobot()
     lastSelect = currentSelect;
 }
 
-/* ---------------- Finished ---------------- */
+/* STOP MOTORS */
 
 void handleFinished()
 {
+    stopMotors();
+
     bool currentSelect = digitalRead(BUTTON_SELECT);
 
-    /*
-     * Press SELECT to return to menu.
-     */
     if (currentSelect == LOW && lastSelect == HIGH)
     {
         Serial.println("Returning to menu");
@@ -250,7 +260,7 @@ void handleFinished()
     lastSelect = currentSelect;
 }
 
-/* ---------------- Motor Test ---------------- */
+/* TEST MOTORS */
 
 void testMotors()
 {
@@ -286,8 +296,7 @@ void testMotors()
     Serial.println("Motor test complete");
 }
 
-
-/* ---------------- Setup ---------------- */
+/* SETUP */
 
 void setup()
 {
@@ -314,10 +323,10 @@ void setup()
     Serial.println("DSA MazeBot ready");
 
     drawMenu();
-    testMotors();
+    /* testMotors(); */
 }
 
-/* ---------------- Main Loop ---------------- */
+/* MAIN LOOP */
 
 void loop()
 {
