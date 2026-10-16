@@ -6,342 +6,315 @@
 #include "sensors.h"
 #include "motors.h"
 
-/* BUTTONS SETUP */
-
+// Existing ESP32-S3 wiring.
 #define BUTTON_UP 4
 #define BUTTON_DOWN 5
 #define BUTTON_SELECT 6
-
-/* OLED SETUP */
-
 #define SDA_PIN 8
 #define SCL_PIN 9
 
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 64
+Adafruit_SSD1306 display(128, 64, &Wire, -1);
 
-Adafruit_SSD1306 display(
-    SCREEN_WIDTH,
-    SCREEN_HEIGHT,
-    &Wire,
-    -1);
+// Same digital detection polarity as your original code.
+const int BLACK_LEVEL = LOW;
 
-/* ROBOT ALGORITHMS */
+// Conservative initial line-following speeds (PWM 0-255).
+const int BASE_SPEED = 135;
+const int MAX_SPEED = 190;
+const int TURN_GAIN = 45;
 
-enum Algorithm
-{
-    DFS,
-    BFS,
-    A_STAR
-};
+// S1 should be the robot's LEFT sensor when facing the IR sensor.
+// If your board is mounted in reverse, set this to true.
+const bool REVERSE_SENSOR_ORDER = false;
 
-Algorithm selectedAlgorithm = DFS;
+const char *menuItems[] = {
+    "DFS (line)",
+    "BFS (line)",
+    "A* (line)",
+    "Motor test",
+    "Sensor test"};
+const int MENU_COUNT = 5;
+int selectedItem = 0;
 
-/* ROBOT STATES */
-
-enum RobotState
+// DFS / BFS / A* are labels for now; all use basic line following.
+enum RobotMode
 {
     MENU,
-    RUNNING,
-    FINISHED
+    SENSORS,
+    MOTOR_TEST,
+    FOLLOWING,
+    STOPPED
 };
-
-RobotState robotState = MENU;
-
-/* BUTTON STATES */
+RobotMode mode = MENU;
 
 bool lastUp = HIGH;
 bool lastDown = HIGH;
 bool lastSelect = HIGH;
+unsigned long lastButtonEvent = 0;
+unsigned long lastScreenUpdate = 0;
+unsigned long lastSerialPrint = 0;
 
-/* OLED FUNCTIONS */
+// Brief motor bench test. Speeds are LEFT, RIGHT (robot perspective).
+struct TestStep
+{
+    const char *name;
+    int leftPWM;
+    int rightPWM;
+    unsigned long durationMs;
+};
+
+const TestStep motorSteps[] = {
+    {"Ready", 0, 0, 500},
+    {"Left motor", 140, 0, 700},
+    {"Pause", 0, 0, 400},
+    {"Right motor", 0, 140, 700},
+    {"Pause", 0, 0, 400},
+    {"Both motors", 140, 140, 800}};
+const int TEST_STEP_COUNT = sizeof(motorSteps) / sizeof(motorSteps[0]);
+int testStep = 0;
+unsigned long testStepStarted = 0;
 
 void drawMenu()
 {
     display.clearDisplay();
-
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
-
-    display.setCursor(25, 0);
+    display.setCursor(22, 0);
     display.println("DSA MazeBot");
 
-    /* DFS */
-    display.setCursor(10, 16);
+    // Four visible menu entries; scroll to reach the fifth.
+    int first = (selectedItem < 4) ? 0 : 1;
+    for (int i = first; i < first + 4; i++)
+    {
+        display.setCursor(5, 13 + (i - first) * 11);
+        display.print(i == selectedItem ? "> " : "  ");
+        display.println(menuItems[i]);
+    }
 
-    if (selectedAlgorithm == DFS)
-        display.println("> DFS");
-    else
-        display.println("  DFS");
-
-    /* BFS */
-    display.setCursor(10, 28);
-
-    if (selectedAlgorithm == BFS)
-        display.println("> BFS");
-    else
-        display.println("  BFS");
-
-    /* A* */
-    display.setCursor(10, 40);
-
-    if (selectedAlgorithm == A_STAR)
-        display.println("> A*");
-    else
-        display.println("  A*");
-
-    display.setCursor(10, 54);
-    display.println("SELECT = Start");
-
+    display.setCursor(8, 57);
+    display.print("SELECT = Start");
     display.display();
 }
 
-void showRunning()
+void drawSensorScreen()
 {
     display.clearDisplay();
-
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
-
-    display.setCursor(38, 5);
-    display.println("Running...");
-
-    display.setCursor(25, 25);
-    display.println("Algorithm:");
-
-    display.setTextSize(2);
-    display.setCursor(42, 40);
-
-    if (selectedAlgorithm == DFS)
-        display.println("DFS");
-    else if (selectedAlgorithm == BFS)
-        display.println("BFS");
-    else if (selectedAlgorithm == A_STAR)
-        display.println("A*");
-
+    display.setCursor(16, 0);
+    display.println("IR SENSOR TEST");
+    display.setCursor(0, 14);
+    display.println("S1 S2 S3 S4 S5");
+    display.setCursor(0, 27);
+    for (int i = 0; i < 5; i++)
+    {
+        display.print(sensorValues[i]);
+        if (i < 4)
+            display.print("  ");
+    }
+    display.setCursor(0, 40);
+    display.print("BLACK: ");
+    for (int i = 0; i < 5; i++)
+        display.print(sensorValues[i] == BLACK_LEVEL ? 'B' : '-');
+    display.setCursor(0, 55);
+    display.println("SELECT = Back");
     display.display();
 }
 
-void showFinished()
+void drawStatus(const char *heading, const char *detail)
 {
     display.clearDisplay();
-
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
-
-    display.setCursor(35, 10);
-    display.println("Maze Done!");
-
-    display.setCursor(20, 30);
-    display.println("SELECT = Menu");
-
+    display.setCursor(5, 5);
+    display.println(heading);
+    display.setCursor(5, 27);
+    display.println(detail);
+    display.setCursor(5, 54);
+    display.println("SELECT = Stop/Menu");
     display.display();
 }
 
-/* MENU DISPLAY */
-
-void handleMenu()
+void stopAndShow(const char *message)
 {
-    bool currentUp = digitalRead(BUTTON_UP);
-    bool currentDown = digitalRead(BUTTON_DOWN);
-    bool currentSelect = digitalRead(BUTTON_SELECT);
-
-    /* UP button */
-    if (currentUp == LOW && lastUp == HIGH)
-    {
-        if (selectedAlgorithm == DFS)
-            selectedAlgorithm = A_STAR;
-        else if (selectedAlgorithm == BFS)
-            selectedAlgorithm = DFS;
-        else if (selectedAlgorithm == A_STAR)
-            selectedAlgorithm = BFS;
-
-        Serial.println("Moved UP");
-
-        drawMenu();
-    }
-
-    /* DOWN BUTTON */
-    if (currentDown == LOW && lastDown == HIGH)
-    {
-        if (selectedAlgorithm == DFS)
-            selectedAlgorithm = BFS;
-        else if (selectedAlgorithm == BFS)
-            selectedAlgorithm = A_STAR;
-        else if (selectedAlgorithm == A_STAR)
-            selectedAlgorithm = DFS;
-
-        Serial.println("Moved DOWN");
-
-        drawMenu();
-    }
-
-    /* SELECT BUTTON */
-    if (currentSelect == LOW && lastSelect == HIGH)
-    {
-        Serial.print("Starting ");
-
-        if (selectedAlgorithm == DFS)
-            Serial.println("DFS...");
-        else if (selectedAlgorithm == BFS)
-            Serial.println("BFS...");
-        else if (selectedAlgorithm == A_STAR)
-            Serial.println("A*...");
-
-        robotState = RUNNING;
-
-        showRunning();
-    }
-
-    lastUp = currentUp;
-    lastDown = currentDown;
-    lastSelect = currentSelect;
+    stopMotors();
+    mode = STOPPED;
+    drawStatus("Motors stopped", message);
+    Serial.println(message);
 }
 
-/* RUNNING ROBOT */
-
-void runRobot()
+void startMotorTestStep()
 {
-    static unsigned long lastSensorPrint = 0;
+    testStepStarted = millis();
+    driveMotors(motorSteps[testStep].leftPWM,
+                motorSteps[testStep].rightPWM);
+    drawStatus("MOTOR BENCH TEST", motorSteps[testStep].name);
+    Serial.print("Motor test: ");
+    Serial.println(motorSteps[testStep].name);
+}
 
-    /*
-     * TEMPORARY MOTOR TEST:
-     * Keep driving forward while robotState == RUNNING.
-     */
-    moveForward();
-
-    /*
-     * Read sensors while moving.
-     */
-    if (millis() - lastSensorPrint >= 200)
+void startSelectedMode()
+{
+    if (selectedItem == 4)
     {
+        mode = SENSORS;
         readSensors();
-        printSensors();
-
-        lastSensorPrint = millis();
+        drawSensorScreen();
     }
-
-    bool currentSelect = digitalRead(BUTTON_SELECT);
-
-    /*
-     * Press SELECT again to stop.
-     */
-    if (currentSelect == LOW && lastSelect == HIGH)
+    else if (selectedItem == 3)
     {
-        Serial.println("Stopping robot");
-
-        stopMotors();
-
-        robotState = FINISHED;
-
-        showFinished();
+        mode = MOTOR_TEST;
+        testStep = 0;
+        startMotorTestStep();
     }
-
-    lastSelect = currentSelect;
+    else
+    {
+        mode = FOLLOWING;
+        drawStatus("LINE FOLLOWING", menuItems[selectedItem]);
+        Serial.println("Line following (not DFS/BFS/A* yet)");
+    }
 }
 
-/* STOP MOTORS */
-
-void handleFinished()
+void handleButtons()
 {
-    stopMotors();
+    bool up = digitalRead(BUTTON_UP);
+    bool down = digitalRead(BUTTON_DOWN);
+    bool select = digitalRead(BUTTON_SELECT);
 
-    bool currentSelect = digitalRead(BUTTON_SELECT);
+    bool upPressed = (up == LOW && lastUp == HIGH);
+    bool downPressed = (down == LOW && lastDown == HIGH);
+    bool selectPressed = (select == LOW && lastSelect == HIGH);
 
-    if (currentSelect == LOW && lastSelect == HIGH)
+    lastUp = up;
+    lastDown = down;
+    lastSelect = select;
+
+    if (millis() - lastButtonEvent < 150)
+        return; // Simple button debounce.
+
+    if (selectPressed)
     {
-        Serial.println("Returning to menu");
+        lastButtonEvent = millis();
+        if (mode == MENU)
+            startSelectedMode();
+        else if (mode == SENSORS || mode == STOPPED)
+        {
+            stopMotors();
+            mode = MENU;
+            drawMenu();
+        }
+        else
+            stopAndShow("Press SELECT for menu");
+        return;
+    }
 
-        robotState = MENU;
-
+    if (mode == MENU && (upPressed || downPressed))
+    {
+        lastButtonEvent = millis();
+        if (upPressed)
+            selectedItem = (selectedItem + MENU_COUNT - 1) % MENU_COUNT;
+        else
+            selectedItem = (selectedItem + 1) % MENU_COUNT;
         drawMenu();
     }
-
-    lastSelect = currentSelect;
 }
 
-/* TEST MOTORS */
-
-void testMotors()
+void updateMotorTest()
 {
-    Serial.println("Testing motors...");
+    if (millis() - testStepStarted < motorSteps[testStep].durationMs)
+        return;
 
-    Serial.println("Forward");
-    moveForward();
-    delay(1000);
-
-    stopMotors();
-    delay(1000);
-
-    Serial.println("Backward");
-    moveBackward();
-    delay(1000);
-
-    stopMotors();
-    delay(1000);
-
-    Serial.println("Left");
-    turnLeft();
-    delay(700);
-
-    stopMotors();
-    delay(1000);
-
-    Serial.println("Right");
-    turnRight();
-    delay(700);
-
-    stopMotors();
-
-    Serial.println("Motor test complete");
+    testStep++;
+    if (testStep >= TEST_STEP_COUNT)
+    {
+        stopAndShow("Motor test complete");
+        return;
+    }
+    startMotorTestStep();
 }
 
-/* SETUP */
+void updateLineFollower()
+{
+    readSensors();
+
+    const int weights[5] = {-2, -1, 0, 1, 2};
+    int blackCount = 0;
+    int weightedSum = 0;
+
+    for (int i = 0; i < 5; i++)
+    {
+        if (sensorValues[i] == BLACK_LEVEL)
+        {
+            blackCount++;
+            weightedSum += weights[i];
+        }
+    }
+
+    // Stop when the line is lost or an uncertain intersection appears.
+    if (blackCount == 0 || blackCount >= 4)
+    {
+        stopMotors();
+    }
+    else
+    {
+        // Keep fractional positions by multiplying before division.
+        int correction = (weightedSum * TURN_GAIN) / blackCount;
+        if (REVERSE_SENSOR_ORDER)
+            correction = -correction;
+
+        int leftPWM = constrain(BASE_SPEED + correction, 0, MAX_SPEED);
+        int rightPWM = constrain(BASE_SPEED - correction, 0, MAX_SPEED);
+        driveMotors(leftPWM, rightPWM);
+    }
+
+    if (millis() - lastSerialPrint >= 250)
+    {
+        printSensors();
+        if (blackCount == 0)
+            Serial.println("Line lost: stopped");
+        else if (blackCount >= 4)
+            Serial.println("Wide line/intersection: stopped");
+        lastSerialPrint = millis();
+    }
+}
 
 void setup()
 {
     Serial.begin(115200);
-
     pinMode(BUTTON_UP, INPUT_PULLUP);
     pinMode(BUTTON_DOWN, INPUT_PULLUP);
     pinMode(BUTTON_SELECT, INPUT_PULLUP);
 
     setupSensors();
-    setupMotors();
+    setupMotors(); // Motors disabled until you choose an option.
 
     Wire.begin(SDA_PIN, SCL_PIN);
-
     if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
     {
         Serial.println("OLED initialization failed!");
-
+        stopMotors();
         while (true)
-        {
-        }
+            delay(1000);
     }
 
-    Serial.println("DSA MazeBot ready");
-
+    Serial.println("MazeBot ready: motors OFF");
     drawMenu();
-    /* testMotors(); */
 }
-
-/* MAIN LOOP */
 
 void loop()
 {
-    if (robotState == MENU)
-    {
-        handleMenu();
-    }
-    else if (robotState == RUNNING)
-    {
-        runRobot();
-    }
-    else if (robotState == FINISHED)
-    {
-        handleFinished();
-    }
+    handleButtons();
 
-    delay(20);
+    if (mode == SENSORS && millis() - lastScreenUpdate >= 120)
+    {
+        readSensors();
+        drawSensorScreen();
+        lastScreenUpdate = millis();
+    }
+    else if (mode == MOTOR_TEST)
+        updateMotorTest();
+    else if (mode == FOLLOWING)
+        updateLineFollower();
+
+    delay(10);
 }
