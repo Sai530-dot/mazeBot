@@ -54,6 +54,19 @@ unsigned long lastButtonEvent = 0;
 unsigned long lastScreenUpdate = 0;
 unsigned long lastSerialPrint = 0;
 
+// Sensor check is deliberately separate from line following. The TCRT5000
+// outputs are digital, so software cannot change the module's threshold.
+// Record a reading only after three consecutive equal samples (60 ms).
+const unsigned long SENSOR_SAMPLE_MS = 20;
+const uint8_t SENSOR_STABLE_SAMPLES = 3;
+unsigned long lastSensorSample = 0;
+int sensorLastRaw[5] = {-1, -1, -1, -1, -1};
+uint8_t sensorSameCount[5] = {0, 0, 0, 0, 0};
+int sensorStable[5] = {-1, -1, -1, -1, -1};
+bool sensorSawLow[5] = {false, false, false, false, false};
+bool sensorSawHigh[5] = {false, false, false, false, false};
+bool sensorSawSolo[5] = {false, false, false, false, false};
+
 // Brief motor bench test. Speeds are LEFT, RIGHT (robot perspective).
 struct TestStep
 {
@@ -96,28 +109,114 @@ void drawMenu()
     display.display();
 }
 
+void resetSensorDiagnostics()
+{
+    // UP resets the evidence so each channel can be retested independently.
+    for (int i = 0; i < 5; i++)
+    {
+        sensorLastRaw[i] = -1;
+        sensorSameCount[i] = 0;
+        sensorStable[i] = -1;
+        sensorSawLow[i] = false;
+        sensorSawHigh[i] = false;
+        sensorSawSolo[i] = false;
+    }
+    readSensors();
+    lastSensorSample = millis();
+    lastScreenUpdate = 0;
+    lastSerialPrint = 0;
+}
+
+void sampleSensorDiagnostics()
+{
+    readSensors();
+
+    for (int i = 0; i < 5; i++)
+    {
+        if (sensorValues[i] == sensorLastRaw[i])
+        {
+            if (sensorSameCount[i] < SENSOR_STABLE_SAMPLES)
+                sensorSameCount[i]++;
+        }
+        else
+        {
+            sensorLastRaw[i] = sensorValues[i];
+            sensorSameCount[i] = 1;
+        }
+
+        if (sensorSameCount[i] >= SENSOR_STABLE_SAMPLES)
+        {
+            sensorStable[i] = sensorValues[i];
+            if (sensorStable[i] == LOW)
+                sensorSawLow[i] = true;
+            else
+                sensorSawHigh[i] = true;
+        }
+    }
+
+    // SOLO means this one channel was different while all other four agreed.
+    // It is useful for detecting an incorrectly wired/shared input.
+    for (int i = 0; i < 5; i++)
+    {
+        if (sensorStable[i] < 0)
+            continue;
+
+        int otherValue = -1;
+        bool othersAgree = true;
+        for (int j = 0; j < 5; j++)
+        {
+            if (j == i)
+                continue;
+            if (sensorStable[j] < 0)
+            {
+                othersAgree = false;
+                break;
+            }
+            if (otherValue < 0)
+                otherValue = sensorStable[j];
+            else if (sensorStable[j] != otherValue)
+            {
+                othersAgree = false;
+                break;
+            }
+        }
+        if (othersAgree && sensorStable[i] != otherValue)
+            sensorSawSolo[i] = true;
+    }
+}
+
 void drawSensorScreen()
 {
     display.clearDisplay();
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
-    display.setCursor(16, 0);
-    display.println("IR SENSOR TEST");
-    display.setCursor(0, 14);
-    display.println("S1 S2 S3 S4 S5");
-    display.setCursor(0, 27);
+    display.setCursor(12, 0);
+    display.println("SENSOR CHECK");
+
+    display.setCursor(0, 12);
+    display.print("CH");
+    display.setCursor(0, 23);
+    display.print("LIVE");
+    display.setCursor(0, 34);
+    display.print("BOTH");
+    display.setCursor(0, 45);
+    display.print("SOLO");
+
     for (int i = 0; i < 5; i++)
     {
-        display.print(sensorValues[i]);
-        if (i < 4)
-            display.print("  ");
+        int x = 38 + i * 17;
+        display.setCursor(x, 12);
+        display.print(i + 1);
+        display.setCursor(x, 23);
+        display.print(sensorStable[i] < 0 ? '-' : char('0' + sensorStable[i]));
+        display.setCursor(x, 34);
+        display.print(sensorSawLow[i] && sensorSawHigh[i] ? 'Y' : '-');
+        display.setCursor(x, 45);
+        display.print(sensorSawSolo[i] ? 'Y' : '-');
     }
-    display.setCursor(0, 40);
-    display.print("BLACK: ");
-    for (int i = 0; i < 5; i++)
-        display.print(sensorValues[i] == BLACK_LEVEL ? 'B' : '-');
-    display.setCursor(0, 55);
-    display.println("SELECT = Back");
+
+    display.setCursor(0, 56);
+    display.print("UP=Reset SEL=Back");
     display.display();
 }
 
@@ -158,8 +257,11 @@ void startSelectedMode()
     if (selectedItem == 4)
     {
         mode = SENSORS;
-        readSensors();
+        resetSensorDiagnostics();
         drawSensorScreen();
+        Serial.println("Sensor test: move a narrow dark card under each sensor.");
+        Serial.println("BOTH = stable LOW and HIGH seen; SOLO = independently different.");
+        Serial.println("UP resets the check. SELECT returns to menu.");
     }
     else if (selectedItem == 3)
     {
@@ -208,6 +310,15 @@ void handleButtons()
         return;
     }
 
+    if (mode == SENSORS && upPressed)
+    {
+        lastButtonEvent = millis();
+        resetSensorDiagnostics();
+        drawSensorScreen();
+        Serial.println("Sensor evidence reset.");
+        return;
+    }
+
     if (mode == MENU && (upPressed || downPressed))
     {
         lastButtonEvent = millis();
@@ -231,6 +342,36 @@ void updateMotorTest()
         return;
     }
     startMotorTestStep();
+}
+
+void updateSensorDiagnostics()
+{
+    unsigned long now = millis();
+
+    if (now - lastSensorSample >= SENSOR_SAMPLE_MS)
+    {
+        lastSensorSample = now;
+        sampleSensorDiagnostics();
+    }
+
+    if (now - lastScreenUpdate >= 120)
+    {
+        drawSensorScreen();
+        lastScreenUpdate = now;
+    }
+
+    if (now - lastSerialPrint >= 500)
+    {
+        printSensors(); // Current raw levels for troubleshooting.
+        Serial.print("BOTH: ");
+        for (int i = 0; i < 5; i++)
+            Serial.print(sensorSawLow[i] && sensorSawHigh[i] ? 'Y' : '-');
+        Serial.print(" | SOLO: ");
+        for (int i = 0; i < 5; i++)
+            Serial.print(sensorSawSolo[i] ? 'Y' : '-');
+        Serial.println();
+        lastSerialPrint = now;
+    }
 }
 
 void updateLineFollower()
@@ -305,12 +446,8 @@ void loop()
 {
     handleButtons();
 
-    if (mode == SENSORS && millis() - lastScreenUpdate >= 120)
-    {
-        readSensors();
-        drawSensorScreen();
-        lastScreenUpdate = millis();
-    }
+    if (mode == SENSORS)
+        updateSensorDiagnostics();
     else if (mode == MOTOR_TEST)
         updateMotorTest();
     else if (mode == FOLLOWING)
