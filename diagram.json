@@ -1,0 +1,394 @@
+{
+  "version": 1,
+  "author": "MazeBot team",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-s3-devkitc-1",
+      "id": "esp",
+      "top": 20,
+      "left": 15,
+      "attrs": {
+        "flashSize": "8",
+        "psramSize": "8",
+        "serialInterface": "USB_SERIAL_JTAG"
+      }
+    },
+    {
+      "type": "board-ssd1306",
+      "id": "oled",
+      "top": -175,
+      "left": 18,
+      "attrs": {
+        "i2cAddress": "0x3c"
+      }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "up",
+      "top": 260,
+      "left": 270,
+      "attrs": {
+        "label": "UP",
+        "color": "green",
+        "key": "U"
+      }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "down",
+      "top": 260,
+      "left": 355,
+      "attrs": {
+        "label": "DOWN",
+        "color": "blue",
+        "key": "D"
+      }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "select",
+      "top": 260,
+      "left": 455,
+      "attrs": {
+        "label": "SELECT",
+        "color": "yellow",
+        "key": "S"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "ledleft",
+      "top": 160,
+      "left": -175,
+      "attrs": {
+        "color": "red",
+        "label": "Left PWM"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "ledright",
+      "top": 235,
+      "left": -175,
+      "attrs": {
+        "color": "blue",
+        "label": "Right PWM"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "resleft",
+      "top": 180,
+      "left": -85,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "resright",
+      "top": 255,
+      "left": -85,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-logic-analyzer",
+      "id": "logic",
+      "top": 350,
+      "left": -190,
+      "attrs": {
+        "channelNames": "PWMA,AIN1,AIN2,PWMB,BIN1,BIN2,STBY"
+      }
+    },
+    {
+      "type": "wokwi-slide-switch",
+      "id": "ir1",
+      "top": -150,
+      "left": 420,
+      "attrs": {
+        "value": "1",
+        "bounce": "0"
+      }
+    },
+    {
+      "type": "wokwi-slide-switch",
+      "id": "ir2",
+      "top": -70,
+      "left": 420,
+      "attrs": {
+        "value": "1",
+        "bounce": "0"
+      }
+    },
+    {
+      "type": "wokwi-slide-switch",
+      "id": "ir3",
+      "top": 10,
+      "left": 420,
+      "attrs": {
+        "value": "1",
+        "bounce": "0"
+      }
+    },
+    {
+      "type": "wokwi-slide-switch",
+      "id": "ir4",
+      "top": 90,
+      "left": 420,
+      "attrs": {
+        "value": "1",
+        "bounce": "0"
+      }
+    },
+    {
+      "type": "wokwi-slide-switch",
+      "id": "ir5",
+      "top": 170,
+      "left": 420,
+      "attrs": {
+        "value": "1",
+        "bounce": "0"
+      }
+    }
+  ],
+  "connections": [
+    [
+      "esp:8",
+      "oled:SDA",
+      "green",
+      []
+    ],
+    [
+      "esp:9",
+      "oled:SCL",
+      "blue",
+      []
+    ],
+    [
+      "esp:3V3.2",
+      "oled:VCC",
+      "red",
+      []
+    ],
+    [
+      "esp:GND.1",
+      "oled:GND",
+      "black",
+      []
+    ],
+    [
+      "esp:4",
+      "up:1.l",
+      "green",
+      []
+    ],
+    [
+      "esp:5",
+      "down:1.l",
+      "green",
+      []
+    ],
+    [
+      "esp:6",
+      "select:1.l",
+      "green",
+      []
+    ],
+    [
+      "esp:GND.1",
+      "up:2.l",
+      "black",
+      []
+    ],
+    [
+      "esp:GND.1",
+      "down:2.l",
+      "black",
+      []
+    ],
+    [
+      "esp:GND.1",
+      "select:2.l",
+      "black",
+      []
+    ],
+    [
+      "esp:39",
+      "ledleft:A",
+      "green",
+      []
+    ],
+    [
+      "ledleft:C",
+      "resleft:1",
+      "green",
+      []
+    ],
+    [
+      "resleft:2",
+      "esp:GND.1",
+      "black",
+      []
+    ],
+    [
+      "esp:40",
+      "ledright:A",
+      "blue",
+      []
+    ],
+    [
+      "ledright:C",
+      "resright:1",
+      "blue",
+      []
+    ],
+    [
+      "resright:2",
+      "esp:GND.1",
+      "black",
+      []
+    ],
+    [
+      "esp:GND.1",
+      "logic:GND",
+      "black",
+      []
+    ],
+    [
+      "esp:39",
+      "logic:D0",
+      "purple",
+      []
+    ],
+    [
+      "esp:15",
+      "logic:D1",
+      "purple",
+      []
+    ],
+    [
+      "esp:16",
+      "logic:D2",
+      "purple",
+      []
+    ],
+    [
+      "esp:40",
+      "logic:D3",
+      "purple",
+      []
+    ],
+    [
+      "esp:17",
+      "logic:D4",
+      "purple",
+      []
+    ],
+    [
+      "esp:18",
+      "logic:D5",
+      "purple",
+      []
+    ],
+    [
+      "esp:38",
+      "logic:D6",
+      "purple",
+      []
+    ],
+    [
+      "esp:10",
+      "ir1:2",
+      "green",
+      []
+    ],
+    [
+      "esp:3V3.2",
+      "ir1:3",
+      "red",
+      []
+    ],
+    [
+      "esp:GND.1",
+      "ir1:1",
+      "black",
+      []
+    ],
+    [
+      "esp:11",
+      "ir2:2",
+      "green",
+      []
+    ],
+    [
+      "esp:3V3.2",
+      "ir2:3",
+      "red",
+      []
+    ],
+    [
+      "esp:GND.1",
+      "ir2:1",
+      "black",
+      []
+    ],
+    [
+      "esp:12",
+      "ir3:2",
+      "green",
+      []
+    ],
+    [
+      "esp:3V3.2",
+      "ir3:3",
+      "red",
+      []
+    ],
+    [
+      "esp:GND.1",
+      "ir3:1",
+      "black",
+      []
+    ],
+    [
+      "esp:13",
+      "ir4:2",
+      "green",
+      []
+    ],
+    [
+      "esp:3V3.2",
+      "ir4:3",
+      "red",
+      []
+    ],
+    [
+      "esp:GND.1",
+      "ir4:1",
+      "black",
+      []
+    ],
+    [
+      "esp:14",
+      "ir5:2",
+      "green",
+      []
+    ],
+    [
+      "esp:3V3.2",
+      "ir5:3",
+      "red",
+      []
+    ],
+    [
+      "esp:GND.1",
+      "ir5:1",
+      "black",
+      []
+    ]
+  ],
+  "dependencies": {}
+}
